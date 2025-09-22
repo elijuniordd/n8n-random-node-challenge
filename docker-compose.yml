@@ -1,0 +1,42 @@
+version: '3.8'
+
+# definindo os serviços/containers que serão executados
+services:
+
+  # banco de dados PostgreSQL.
+  db:
+    image: postgres:15
+    restart: always
+    # para senhas não ficarem expostas no arquivo compose
+    env_file: .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # verificação de saúde do banco de dados
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # serviço principal do n8n.
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: always
+    # interface do n8n em http://localhost:5678.
+    ports:
+      - "5678:5678"
+    env_file: .env
+    environment: # configurações específicas do n8n
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PORT=5432
+      - N8N_BASIC_AUTH_ACTIVE=true
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - ./custom-nodes:/home/node/.n8n/custom
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  postgres_data: # volume para persistência dos dados do PostgreSQL
